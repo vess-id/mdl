@@ -1,10 +1,11 @@
 import * as jose from 'jose';
+import { KeyLike } from 'jose';
 import { COSEKeyFromJWK, COSEKeyToJWK, ProtectedHeaders, UnprotectedHeaders } from 'cose-kit';
 import { fromPEM } from '../utils';
 import { DataItem, DateOnly, cborDecode, cborEncode } from '../../cbor';
 import { IssuerSignedItem } from '../IssuerSignedItem';
 import IssuerAuth from './IssuerAuth';
-import { DeviceKeyInfo, DigestAlgorithm, DocType, IssuerNameSpaces, MSO, SupportedAlgs, ValidityInfo } from './types';
+import { DeviceKeyInfo, DigestAlgorithm, DocType, IssuerNameSpaces, MSO, SupportedAlgs, ValidityInfo, CoseSign1SignerCallback } from './types';
 import { IssuerSignedDocument } from './IssuerSignedDocument';
 
 const DEFAULT_NS = 'org.iso.18013.5.1';
@@ -169,13 +170,22 @@ export class Document {
    * @returns {Promise<IssuerSignedDoc>} - The signed document
    */
   async sign(params: {
-    issuerPrivateKey: jose.JWK | Uint8Array,
+    issuerPrivateKey?: jose.JWK | Uint8Array,
+    signer?: CoseSign1SignerCallback,
     issuerCertificate: string | Uint8Array | Array<string | Uint8Array>,
     alg: SupportedAlgs,
     kid?: string | Uint8Array,
   }): Promise<IssuerSignedDocument> {
     if (!this.#issuerNameSpaces) {
       throw new Error('No namespaces added');
+    }
+
+    // Validate that either issuerPrivateKey or signer is provided, but not both
+    if (!params.issuerPrivateKey && !params.signer) {
+      throw new Error('Either issuerPrivateKey or signer must be provided');
+    }
+    if (params.issuerPrivateKey && params.signer) {
+      throw new Error('Cannot provide both issuerPrivateKey and signer');
     }
 
     let issuerCertificateChain: Uint8Array[];
@@ -188,11 +198,15 @@ export class Document {
       issuerCertificateChain = [params.issuerCertificate];
     }
 
-    const issuerPrivateKeyJWK = params.issuerPrivateKey instanceof Uint8Array ?
-      COSEKeyToJWK(params.issuerPrivateKey) :
-      params.issuerPrivateKey;
+    let issuerPrivateKeyJWK: jose.JWK | undefined;
+    let issuerPrivateKey: KeyLike | undefined;
 
-    const issuerPrivateKey = await jose.importJWK(issuerPrivateKeyJWK);
+    if (params.issuerPrivateKey) {
+      issuerPrivateKeyJWK = params.issuerPrivateKey instanceof Uint8Array ?
+        COSEKeyToJWK(params.issuerPrivateKey) :
+        params.issuerPrivateKey;
+      issuerPrivateKey = await jose.importJWK(issuerPrivateKeyJWK) as KeyLike;
+    }
 
     const valueDigests = new Map(await Promise.all(Object.entries(this.#issuerNameSpaces).map(async ([namespace, items]) => {
       const digestMap = new Map<number, Uint8Array>();
@@ -215,16 +229,30 @@ export class Document {
     const payload = cborEncode(DataItem.fromData(mso));
     const protectedHeader: ProtectedHeaders = { alg: params.alg };
     const unprotectedHeader: UnprotectedHeaders = {
-      kid: params.kid ?? issuerPrivateKeyJWK.kid,
+      kid: params.kid ?? issuerPrivateKeyJWK?.kid,
       x5chain: issuerCertificateChain.length === 1 ? issuerCertificateChain[0] : issuerCertificateChain,
     };
 
-    const issuerAuth = await IssuerAuth.sign(
-      protectedHeader,
-      unprotectedHeader,
-      payload,
-      issuerPrivateKey,
-    );
+    let issuerAuth: IssuerAuth;
+
+    if (params.signer) {
+      // Use the callback signer
+      issuerAuth = await IssuerAuth.signWithCallback(
+        protectedHeader,
+        unprotectedHeader,
+        payload,
+        params.signer,
+        params.alg,
+      );
+    } else {
+      // Use the traditional private key signing
+      issuerAuth = await IssuerAuth.sign(
+        protectedHeader,
+        unprotectedHeader,
+        payload,
+        issuerPrivateKey!,
+      );
+    }
 
     const issuerSigned = {
       issuerAuth,

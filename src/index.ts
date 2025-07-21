@@ -10,3 +10,12 @@ export { DeviceResponse } from './mdoc/model/DeviceResponse';
 export { MDLError, MDLParseError } from './mdoc/errors';
 export { VerificationAssessmentId } from './mdoc/checkCallback';
 export { getCborEncodeDecodeOptions, setCborEncodeDecodeOptions } from './cbor';
+
+// Export COSE_Sign1 signer callback interfaces
+export {
+  CoseSign1Signer,
+  CoseSign1ContextualSigner,
+  CoseSign1SignerCallback,
+  CoseSign1SigningContext,
+  SupportedAlgs
+} from './mdoc/model/types';
