@@ -117,13 +117,15 @@ export default class IssuerAuth extends Sign1 {
           else if (value === 'ES384') numericValue = -35;
           else if (value === 'ES512') numericValue = -36;
           else if (value === 'EdDSA') numericValue = -8;
-          else numericValue = value; // Keep original if not recognized
+          else numericValue = typeof value === 'number' ? value : value; // Keep original if not recognized
         } else {
           numericKey = typeof key === 'string' ? parseInt(key, 10) : key;
         }
         return [numericKey, numericValue];
       }),
     );
+
+    console.log('protectedHeadersMap', protectedHeadersMap);
 
     // Manually encode protected headers according to COSE specification
     // Protected headers must be a CBOR-encoded map
@@ -136,6 +138,7 @@ export default class IssuerAuth extends Sign1 {
       new Uint8Array(),
       payload,
     );
+    console.log('sigStructure', sigStructure);
 
     let signature: Uint8Array;
 
@@ -189,14 +192,19 @@ export default class IssuerAuth extends Sign1 {
           Object.entries(unprotectedHeaders).map(([key, value]) => {
             // Map COSE header parameter names to their numeric keys
             let numericKey: number;
+            let processedValue: any = value;
             if (key === 'x5chain') {
               numericKey = 33; // COSE x5chain parameter
             } else if (key === 'kid') {
               numericKey = 4; // COSE kid parameter
+              // Ensure kid is encoded as bytes if it's a string
+              if (typeof value === 'string') {
+                processedValue = new TextEncoder().encode(value);
+              }
             } else {
               numericKey = typeof key === 'string' ? parseInt(key, 10) : key;
             }
-            return [numericKey, value];
+            return [numericKey, processedValue];
           }),
         );
       }
