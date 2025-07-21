@@ -1,6 +1,6 @@
 {
   "name": "@vess-id/mdl",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Parse and and validate MDOC CBOR encoded binaries according to ISO 18013-5.",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

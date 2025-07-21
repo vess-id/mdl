@@ -332,6 +332,7 @@ export class Verifier {
       encodedSessionTranscript?: Uint8Array,
       ephemeralReaderKey?: Uint8Array,
       disableCertificateChainValidation?: boolean,
+      skipDeviceSignatureVerification?: boolean,
       onCheck?: UserDefinedVerificationCallback
     } = {},
   ): Promise<MDoc> {
@@ -364,11 +365,13 @@ export class Verifier {
       const { issuerAuth } = document.issuerSigned;
       await this.verifyIssuerSignature(issuerAuth, options.disableCertificateChainValidation, onCheck);
 
-      await this.verifyDeviceSignature(document, {
-        ephemeralPrivateKey: options.ephemeralReaderKey,
-        sessionTranscriptBytes: options.encodedSessionTranscript,
-        onCheck,
-      });
+      if (!options.skipDeviceSignatureVerification) {
+        await this.verifyDeviceSignature(document, {
+          ephemeralPrivateKey: options.ephemeralReaderKey,
+          sessionTranscriptBytes: options.encodedSessionTranscript,
+          onCheck,
+        });
+      }
 
       await this.verifyData(document, onCheck);
     }
