@@ -1,4 +1,4 @@
-[![npm version](https://badge.fury.io/js/@auth0%2Fmdl.svg)](https://badge.fury.io/js/@auth0%2Fmdl)
+[![npm version](https://badge.fury.io/js/@vess-id%2Fmdl.svg)](https://badge.fury.io/js/@vess-id%2Fmdl)
 
 # mDL
 
@@ -9,22 +9,25 @@ This is a Node.js library to issue and verify mDL [CBOR encoded](https://cbor.io
 ## Installation
 
 ```bash
-npm i @auth0/mdl
+npm i @vess-id/mdl
 ```
 
 ## Verifying a credential
 
 ```javascript
-import { Verifier } from "@auth0/mdl";
+import { Verifier } from "@vess-id/mdl";
 import { inspect } from "node:util";
 import fs from "node:fs";
 
 (async () => {
-  const encodedDeviceResponse = Buffer.from(encodedDeviceResponseHex, 'hex');
-  const encodedSessionTranscript = Buffer.from(encodedSessionTranscriptHex, 'hex');
-  const ephemeralReaderKey = Buffer.from(ephemeralReaderKeyHex, 'hex');
+  const encodedDeviceResponse = Buffer.from(encodedDeviceResponseHex, "hex");
+  const encodedSessionTranscript = Buffer.from(
+    encodedSessionTranscriptHex,
+    "hex"
+  );
+  const ephemeralReaderKey = Buffer.from(ephemeralReaderKeyHex, "hex");
 
-  const trustedCerts = [fs.readFileSync('./caCert1.pem')/*, ... */];
+  const trustedCerts = [fs.readFileSync("./caCert1.pem") /*, ... */];
   const verifier = new Verifier(trustedCerts);
   const mdoc = await verifier.verify(encodedDeviceResponse, {
     ephemeralReaderKey,
@@ -39,22 +42,28 @@ import fs from "node:fs";
 ## Getting diagnostic information
 
 ```javascript
-import { Verifier } from "@auth0/mdl";
+import { Verifier } from "@vess-id/mdl";
 import { inspect } from "node:util";
 import fs from "node:fs";
 
 (async () => {
-  const encodedDeviceResponse = Buffer.from(encodedDeviceResponseHex, 'hex');
-  const encodedSessionTranscript = Buffer.from(encodedSessionTranscriptHex, 'hex');
-  const ephemeralReaderKey = Buffer.from(ephemeralReaderKeyHex, 'hex');
+  const encodedDeviceResponse = Buffer.from(encodedDeviceResponseHex, "hex");
+  const encodedSessionTranscript = Buffer.from(
+    encodedSessionTranscriptHex,
+    "hex"
+  );
+  const ephemeralReaderKey = Buffer.from(ephemeralReaderKeyHex, "hex");
 
-  const trustedCerts = [fs.readFileSync('./caCert1.pem')/*, ... */];
+  const trustedCerts = [fs.readFileSync("./caCert1.pem") /*, ... */];
   const verifier = new Verifier(trustedCerts);
 
-  const diagnosticInfo = await verifier.getDiagnosticInformation(encodedDeviceResponse, {
-    ephemeralReaderKey,
-    encodedSessionTranscript,
-  });
+  const diagnosticInfo = await verifier.getDiagnosticInformation(
+    encodedDeviceResponse,
+    {
+      ephemeralReaderKey,
+      encodedSessionTranscript,
+    }
+  );
 
   inspect(diagnosticInfo);
 })();
@@ -63,17 +72,17 @@ import fs from "node:fs";
 ## Issuing a credential
 
 ```js
-import { MDoc, Document } from "@auth0/mdl";
+import { MDoc, Document } from "@vess-id/mdl";
 import { inspect } from "node:util";
 
 (async () => {
-  const document = await new Document('org.iso.18013.5.1.mDL')
-    .addIssuerNameSpace('org.iso.18013.5.1', {
-      family_name: 'Jones',
-      given_name: 'Ava',
-      birth_date: '2007-03-25',
+  const document = await new Document("org.iso.18013.5.1.mDL")
+    .addIssuerNameSpace("org.iso.18013.5.1", {
+      family_name: "Jones",
+      given_name: "Ava",
+      birth_date: "2007-03-25",
     })
-    .useDigestAlgorithm('SHA-256')
+    .useDigestAlgorithm("SHA-256")
     .addValidityInfo({
       signed: new Date(),
     })
@@ -92,7 +101,7 @@ import { inspect } from "node:util";
 ## Generating a device response
 
 ```js
-import { DeviceResponse, MDoc } from '@auth0/mdl';
+import { DeviceResponse, MDoc } from "@vess-id/mdl";
 
 (async () => {
   let issuerMDoc;
@@ -106,13 +115,13 @@ import { DeviceResponse, MDoc } from '@auth0/mdl';
     let issuerCertificate;
     let devicePublicKey; // the public key for the device, as a JWK
 
-    const document = await new Document('org.iso.18013.5.1.mDL')
-      .addIssuerNameSpace('org.iso.18013.5.1', {
-        family_name: 'Jones',
-        given_name: 'Ava',
-        birth_date: '2007-03-25',
+    const document = await new Document("org.iso.18013.5.1.mDL")
+      .addIssuerNameSpace("org.iso.18013.5.1", {
+        family_name: "Jones",
+        given_name: "Ava",
+        birth_date: "2007-03-25",
       })
-      .useDigestAlgorithm('SHA-256')
+      .useDigestAlgorithm("SHA-256")
       .addValidityInfo({
         signed: new Date(),
       })
@@ -120,7 +129,7 @@ import { DeviceResponse, MDoc } from '@auth0/mdl';
       .sign({
         issuerPrivateKey,
         issuerCertificate,
-        alg: 'ES256',
+        alg: "ES256",
       });
 
     issuerMDoc = new MDoc([document]).encode();
@@ -135,17 +144,19 @@ import { DeviceResponse, MDoc } from '@auth0/mdl';
     // Parameters coming from the OID4VP transaction
     let mdocGeneratedNonce, clientId, responseUri, verifierGeneratedNonce;
     let presentationDefinition = {
-      id: 'family_name_only',
+      id: "family_name_only",
       input_descriptors: [
         {
-          id: 'org.iso.18013.5.1.mDL',
-          format: { mso_mdoc: { alg: ['EdDSA', 'ES256'] } },
+          id: "org.iso.18013.5.1.mDL",
+          format: { mso_mdoc: { alg: ["EdDSA", "ES256"] } },
           constraints: {
-            limit_disclosure: 'required',
-            fields: [{
+            limit_disclosure: "required",
+            fields: [
+              {
                 path: ["$['org.iso.18013.5.1']['family_name']"],
                 intent_to_retain: false,
-              }],
+              },
+            ],
           },
         },
       ],
@@ -153,8 +164,13 @@ import { DeviceResponse, MDoc } from '@auth0/mdl';
 
     deviceResponseMDoc = await DeviceResponse.from(issuerMDoc)
       .usingPresentationDefinition(presentationDefinition)
-      .usingSessionTranscriptForOID4VP(mdocGeneratedNonce, clientId, responseUri, verifierGeneratedNonce)
-      .authenticateWithSignature(devicePrivateKey, 'ES256')
+      .usingSessionTranscriptForOID4VP(
+        mdocGeneratedNonce,
+        clientId,
+        responseUri,
+        verifierGeneratedNonce
+      )
+      .authenticateWithSignature(devicePrivateKey, "ES256")
       .sign();
   }
 })();

@@ -1,6 +1,6 @@
 {
-  "name": "@auth0/mdl",
-  "version": "1.5.0",
+  "name": "@vess-id/mdl",
+  "version": "0.0.1",
   "description": "Parse and and validate MDOC CBOR encoded binaries according to ISO 18013-5.",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -12,10 +12,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/auth0-lab/mdl.git"
+    "url": "https://github.com/vess-id/mdl.git"
   },
   "keywords": [
-    "auth0",
+    "vess",
     "mdl",
     "iso-18013-5",
     "iso-18013-7",
@@ -73,6 +73,7 @@
     "cose-kit": "^1.7.1",
     "debug": "^4.3.4",
     "jose": "^4.15.5",
+    "pkijs": "^3.2.5",
     "uncrypto": "^0.1.3"
   },
   "engines": {
