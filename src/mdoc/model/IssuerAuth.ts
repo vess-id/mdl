@@ -107,8 +107,21 @@ export default class IssuerAuth extends Sign1 {
     // Create the protected headers map and encode it
     const protectedHeadersMap = new Map(
       Object.entries(protectedHeaders).map(([key, value]) => {
-        const numericKey = typeof key === 'string' ? parseInt(key, 10) : key;
-        return [numericKey, value];
+        // Map COSE header parameter names to their numeric keys
+        let numericKey: number;
+        let numericValue: any = value;
+        if (key === 'alg') {
+          numericKey = 1; // COSE alg parameter
+          // Convert algorithm string to COSE algorithm identifier
+          if (value === 'ES256') numericValue = -7;
+          else if (value === 'ES384') numericValue = -35;
+          else if (value === 'ES512') numericValue = -36;
+          else if (value === 'EdDSA') numericValue = -8;
+          else numericValue = value; // Keep original if not recognized
+        } else {
+          numericKey = typeof key === 'string' ? parseInt(key, 10) : key;
+        }
+        return [numericKey, numericValue];
       }),
     );
 
@@ -174,8 +187,15 @@ export default class IssuerAuth extends Sign1 {
       } else {
         unprotectedHeadersMap = new Map(
           Object.entries(unprotectedHeaders).map(([key, value]) => {
-            const numericKey =
-                typeof key === 'string' ? parseInt(key, 10) : key;
+            // Map COSE header parameter names to their numeric keys
+            let numericKey: number;
+            if (key === 'x5chain') {
+              numericKey = 33; // COSE x5chain parameter
+            } else if (key === 'kid') {
+              numericKey = 4; // COSE kid parameter
+            } else {
+              numericKey = typeof key === 'string' ? parseInt(key, 10) : key;
+            }
             return [numericKey, value];
           }),
         );
