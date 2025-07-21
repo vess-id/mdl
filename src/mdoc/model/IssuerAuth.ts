@@ -104,28 +104,61 @@ export default class IssuerAuth extends Sign1 {
     signer: CoseSign1SignerCallback,
     algorithm: SupportedAlgs,
   ): Promise<IssuerAuth> {
-    // Create the protected headers map and encode it
-    const protectedHeadersMap = new Map(
-      Object.entries(protectedHeaders).map(([key, value]) => {
-        // Map COSE header parameter names to their numeric keys
-        let numericKey: number;
-        let numericValue: any = value;
-        if (key === 'alg') {
-          numericKey = 1; // COSE alg parameter
-          // Convert algorithm string to COSE algorithm identifier
-          if (value === 'ES256') numericValue = -7;
-          else if (value === 'ES384') numericValue = -35;
-          else if (value === 'ES512') numericValue = -36;
-          else if (value === 'EdDSA') numericValue = -8;
-          else numericValue = typeof value === 'number' ? value : value; // Keep original if not recognized
-        } else {
-          numericKey = typeof key === 'string' ? parseInt(key, 10) : key;
-        }
-        return [numericKey, numericValue];
-      }),
-    );
+    // Create the protected headers map using standard COSE header mappings
+    const protectedHeadersMap = new Map();
 
-    console.log('protectedHeadersMap', protectedHeadersMap);
+    for (const [key, value] of Object.entries(protectedHeaders)) {
+      let numericKey: number;
+      let processedValue: any = value;
+
+      // Map COSE header parameter names to their numeric keys
+      switch (key) {
+        case 'alg':
+          numericKey = 1;
+          // Convert algorithm string to COSE algorithm identifier
+          if (value === 'ES256') processedValue = -7;
+          else if (value === 'ES384') processedValue = -35;
+          else if (value === 'ES512') processedValue = -36;
+          else if (value === 'EdDSA') processedValue = -8;
+          else if (typeof value === 'number') processedValue = value;
+          else throw new Error(`Unsupported algorithm: ${value}`);
+          break;
+        case 'crit':
+          numericKey = 2;
+          break;
+        case 'ctyp':
+          numericKey = 3;
+          // Convert string to UTF-8 bytes if needed
+          if (typeof value === 'string') {
+            processedValue = new TextEncoder().encode(value);
+          }
+          break;
+        case 'kid':
+          numericKey = 4;
+          // Convert string to UTF-8 bytes
+          if (typeof value === 'string') {
+            processedValue = new TextEncoder().encode(value);
+          }
+          break;
+        case 'x5chain':
+          numericKey = 33;
+          break;
+        default: {
+          // Try parsing as numeric key
+          const parsedKey = typeof key === 'string' ? parseInt(key, 10) : key;
+          if (Number.isNaN(parsedKey)) {
+            throw new Error(`Unknown COSE header parameter: ${key}`);
+          }
+          numericKey = parsedKey;
+          // Convert strings to bytes for consistency with cose-kit
+          if (typeof value === 'string') {
+            processedValue = new TextEncoder().encode(value);
+          }
+        }
+      }
+
+      protectedHeadersMap.set(numericKey, processedValue);
+    }
 
     // Manually encode protected headers according to COSE specification
     // Protected headers must be a CBOR-encoded map
@@ -138,7 +171,6 @@ export default class IssuerAuth extends Sign1 {
       new Uint8Array(),
       payload,
     );
-    console.log('sigStructure', sigStructure);
 
     let signature: Uint8Array;
 
@@ -188,25 +220,69 @@ export default class IssuerAuth extends Sign1 {
       if (unprotectedHeaders instanceof Map) {
         unprotectedHeadersMap = unprotectedHeaders;
       } else {
-        unprotectedHeadersMap = new Map(
-          Object.entries(unprotectedHeaders).map(([key, value]) => {
-            // Map COSE header parameter names to their numeric keys
-            let numericKey: number;
-            let processedValue: any = value;
-            if (key === 'x5chain') {
-              numericKey = 33; // COSE x5chain parameter
-            } else if (key === 'kid') {
-              numericKey = 4; // COSE kid parameter
-              // Ensure kid is encoded as bytes if it's a string
+        unprotectedHeadersMap = new Map();
+
+        for (const [key, value] of Object.entries(unprotectedHeaders)) {
+          let numericKey: number;
+          let processedValue: any = value;
+
+          // if value is undefined, skip
+          if (value === undefined) {
+            continue;
+          }
+
+          // Map COSE header parameter names to their numeric keys
+          switch (key) {
+            case 'alg':
+              numericKey = 1;
+              // Convert algorithm string to COSE algorithm identifier
+              if (value === 'ES256') processedValue = -7;
+              else if (value === 'ES384') processedValue = -35;
+              else if (value === 'ES512') processedValue = -36;
+              else if (value === 'EdDSA') processedValue = -8;
+              else if (typeof value === 'number') processedValue = value;
+              else throw new Error(`Unsupported algorithm: ${value}`);
+              break;
+            case 'crit':
+              numericKey = 2;
+              break;
+            case 'ctyp':
+              numericKey = 3;
+              // Convert string to UTF-8 bytes if needed
               if (typeof value === 'string') {
                 processedValue = new TextEncoder().encode(value);
               }
-            } else {
-              numericKey = typeof key === 'string' ? parseInt(key, 10) : key;
+              break;
+            case 'kid':
+              numericKey = 4;
+              // RFC 8152: kid must be encoded as byte string (bstr)
+              if (typeof value === 'string') {
+                processedValue = new TextEncoder().encode(value);
+              } else if (value instanceof Uint8Array) {
+                processedValue = value; // Already byte array
+              } else {
+                throw new Error('kid parameter must be a string or Uint8Array');
+              }
+              break;
+            case 'x5chain':
+              numericKey = 33;
+              break;
+            default: {
+              // Try parsing as numeric key
+              const parsedKey = typeof key === 'string' ? parseInt(key, 10) : key;
+              if (Number.isNaN(parsedKey)) {
+                throw new Error(`Unknown COSE header parameter: ${key}`);
+              }
+              numericKey = parsedKey;
+              // Convert strings to bytes for consistency with cose-kit
+              if (typeof value === 'string') {
+                processedValue = new TextEncoder().encode(value);
+              }
             }
-            return [numericKey, processedValue];
-          }),
-        );
+          }
+
+          unprotectedHeadersMap.set(numericKey, processedValue);
+        }
       }
     } else {
       unprotectedHeadersMap = new Map();

@@ -12,7 +12,7 @@ describe('Signer Callback Tests', () => {
     const issuerKeyPair = await jose.generateKeyPair('ES256');
     issuerPrivateKey = await jose.exportJWK(issuerKeyPair.privateKey);
 
-    // Generate device key pair  
+    // Generate device key pair
     const deviceKeyPair = await jose.generateKeyPair('ES256');
     devicePublicKey = await jose.exportJWK(deviceKeyPair.publicKey);
 
@@ -105,7 +105,7 @@ describe('Signer Callback Tests', () => {
   describe('Error Handling', () => {
     it('should throw error when both issuerPrivateKey and signer are provided', async () => {
       const basicSigner: CoseSign1Signer = async () => new Uint8Array(64);
-      
+
       const document = new Document('org.iso.18013.5.1.mDL')
         .addIssuerNameSpace('org.iso.18013.5.1', { family_name: 'Test' });
 
@@ -115,7 +115,7 @@ describe('Signer Callback Tests', () => {
           signer: basicSigner,
           issuerCertificate,
           alg: 'ES256',
-        })
+        }),
       ).rejects.toThrow('Cannot provide both issuerPrivateKey and signer');
     });
 
@@ -127,7 +127,7 @@ describe('Signer Callback Tests', () => {
         document.sign({
           issuerCertificate,
           alg: 'ES256',
-        } as any)
+        } as any),
       ).rejects.toThrow('Either issuerPrivateKey or signer must be provided');
     });
   });
