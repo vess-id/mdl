@@ -273,3 +273,8 @@ import { DeviceResponse, MDoc } from "@vess-id/mdl";
 ## License
 
 Apache-2.0
+
+## Credits
+Thanks to:
+
+- [auth0/mdl](https://github.com/auth0-lab/mdl) for the mdl implementation on which this repository is based.
