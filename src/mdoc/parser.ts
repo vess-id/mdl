@@ -72,42 +72,65 @@ export const parse = (
 ): MDoc => {
   let deviceResponse;
   try {
-    deviceResponse = cborDecode(encoded) as Map<string, any>;
+    deviceResponse = cborDecode(encoded);
   } catch (err) {
     throw new MDLParseError(`Unable to decode device response: ${err.message}`);
   }
 
-  const { version, documents, status } = Object.fromEntries(deviceResponse);
+  // Handle both Map and Object responses from cbor-x
+  const isResponseMap = deviceResponse instanceof Map;
+  const responseData = isResponseMap
+    ? Object.fromEntries(deviceResponse)
+    : deviceResponse;
 
-  const parsedDocuments: IssuerSignedDocument[] = documents.map((doc: Map<string, any>): IssuerSignedDocument => {
+  const { version, documents, status } = responseData;
+
+  const parsedDocuments: IssuerSignedDocument[] = documents.map((doc: any): IssuerSignedDocument => {
+    // Helper functions to handle both Map and Object
+    const isDocMap = doc instanceof Map;
+    const getDocKey = (key: string) => isDocMap ? doc.get(key) : doc[key];
+    const hasDocKey = (key: string) => isDocMap ? doc.has(key) : key in doc;
+
+    const issuerSignedData = getDocKey('issuerSigned');
+    const getIssuerSignedKey = (key: string) =>
+      issuerSignedData instanceof Map ? issuerSignedData.get(key) : issuerSignedData[key];
+
     const issuerAuth = parseIssuerAuthElement(
-      doc.get('issuerSigned').get('issuerAuth'),
-      doc.get('docType'),
+      getIssuerSignedKey('issuerAuth'),
+      getDocKey('docType'),
     );
 
-    const issuerSigned = doc.has('issuerSigned') ? {
-      ...doc.get('issuerSigned'),
+    const issuerSigned = hasDocKey('issuerSigned') ? {
+      ...issuerSignedData,
       nameSpaces: mapIssuerNameSpaces(
-        doc.get('issuerSigned').get('nameSpaces'),
+        getIssuerSignedKey('nameSpaces'),
       ),
       issuerAuth,
     } : undefined;
 
-    const deviceSigned = doc.has('deviceSigned') ? {
-      ...doc.get('deviceSigned'),
-      nameSpaces: mapDeviceNameSpaces(doc.get('deviceSigned').get('nameSpaces').data),
-      deviceAuth: parseDeviceAuthElement(doc.get('deviceSigned').get('deviceAuth')),
-    } : undefined;
+    const deviceSigned = hasDocKey('deviceSigned') ? (() => {
+      const deviceSignedData = getDocKey('deviceSigned');
+      const getDeviceSignedKey = (key: string) =>
+        deviceSignedData instanceof Map ? deviceSignedData.get(key) : deviceSignedData[key];
+      const nameSpacesData = getDeviceSignedKey('nameSpaces');
+      const nameSpacesDataValue = nameSpacesData instanceof Map ? nameSpacesData.get('data') : nameSpacesData.data;
+
+      return {
+        ...deviceSignedData,
+        nameSpaces: mapDeviceNameSpaces(nameSpacesDataValue),
+        deviceAuth: parseDeviceAuthElement(getDeviceSignedKey('deviceAuth')),
+      };
+    })() : undefined;
 
     if (deviceSigned) {
       return new DeviceSignedDocument(
-        doc.get('docType'),
+        getDocKey('docType'),
         issuerSigned,
         deviceSigned,
       );
     }
     return new IssuerSignedDocument(
-      doc.get('docType'),
+      getDocKey('docType'),
       issuerSigned,
     );
   });
@@ -147,23 +170,30 @@ export const parseIssuerSigned = (
     throw new MDLParseError('Invalid IssuerSigned CBOR');
   }
 
-  // Check for Map structure (CBOR decodes to Map)
-  if (!(decoded instanceof Map)) {
-    throw new MDLParseError('IssuerSigned must be a CBOR Map');
+  // Check for Map or Object structure (cbor-x may decode to either)
+  const isMap = decoded instanceof Map;
+  const isObject = !isMap && typeof decoded === 'object' && decoded !== null;
+
+  if (!isMap && !isObject) {
+    throw new MDLParseError('IssuerSigned must be a CBOR Map or Object');
   }
 
-  if (!decoded.has('nameSpaces') || !decoded.has('issuerAuth')) {
+  // Helper functions to access properties regardless of Map or Object
+  const hasKey = (key: string) => isMap ? decoded.has(key) : key in decoded;
+  const getKey = (key: string) => isMap ? decoded.get(key) : (decoded as any)[key];
+
+  if (!hasKey('nameSpaces') || !hasKey('issuerAuth')) {
     throw new MDLParseError(
       'Invalid IssuerSigned structure: missing nameSpaces or issuerAuth',
     );
   }
 
   // Parse issuerAuth
-  const rawIssuerAuth = decoded.get('issuerAuth');
+  const rawIssuerAuth = getKey('issuerAuth');
   const issuerAuth = parseIssuerAuthElement(rawIssuerAuth, docType);
 
   // Parse nameSpaces
-  const rawNameSpaces = decoded.get('nameSpaces');
+  const rawNameSpaces = getKey('nameSpaces');
   const nameSpaces = mapIssuerNameSpaces(rawNameSpaces);
 
   // Create IssuerSigned object
