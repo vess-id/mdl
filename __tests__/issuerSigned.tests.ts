@@ -1,4 +1,4 @@
-import { Document, IssuerSignedDocument } from '../src';
+import { Document, IssuerSignedDocument, parseIssuerSigned, MDoc } from '../src';
 import { cborDecode } from '../src/cbor';
 
 describe('IssuerSigned Encoding for OID4VCI', () => {
@@ -154,6 +154,123 @@ describe('IssuerSigned Encoding for OID4VCI', () => {
 
       expect(credentialResponse.credentials[0].credential).toBe(base64url);
       expect(typeof credentialResponse.credentials[0].credential).toBe('string');
+    });
+  });
+
+  describe('parseIssuerSigned (OID4VCI to OID4VP)', () => {
+    it('should parse IssuerSigned CBOR to IssuerSignedDocument', () => {
+      const issuerSignedCbor = signedDocument.encodeIssuerSigned();
+
+      // Parse back to IssuerSignedDocument
+      const parsed = parseIssuerSigned(
+        issuerSignedCbor,
+        'org.iso.18013.5.1.mDL'
+      );
+
+      expect(parsed).toBeInstanceOf(IssuerSignedDocument);
+      expect(parsed.docType).toBe('org.iso.18013.5.1.mDL');
+      expect(parsed.issuerSignedNameSpaces).toContain('org.iso.18013.5.1');
+    });
+
+    it('should preserve namespace data after parsing', () => {
+      const issuerSignedCbor = signedDocument.encodeIssuerSigned();
+      const parsed = parseIssuerSigned(issuerSignedCbor, 'org.iso.18013.5.1.mDL');
+
+      // Check that namespace data is preserved
+      const namespace = parsed.getIssuerNameSpace('org.iso.18013.5.1');
+      expect(namespace).toHaveProperty('given_name');
+      expect(namespace.given_name).toBe('John');
+      expect(namespace).toHaveProperty('family_name');
+      expect(namespace.family_name).toBe('Doe');
+    });
+
+    it('should create MDoc from parsed IssuerSigned', () => {
+      const issuerSignedCbor = signedDocument.encodeIssuerSigned();
+      const parsed = parseIssuerSigned(issuerSignedCbor, 'org.iso.18013.5.1.mDL');
+
+      // Create MDoc for OID4VP presentation
+      const mdoc = new MDoc([parsed]);
+
+      expect(mdoc.documents.length).toBe(1);
+      expect(mdoc.documents[0].docType).toBe('org.iso.18013.5.1.mDL');
+      expect(mdoc.version).toBe('1.0');
+    });
+
+    it('should encode to DeviceResponse format for OID4VP', () => {
+      const issuerSignedCbor = signedDocument.encodeIssuerSigned();
+      const parsed = parseIssuerSigned(issuerSignedCbor, 'org.iso.18013.5.1.mDL');
+
+      // Create MDoc and encode to DeviceResponse
+      const mdoc = new MDoc([parsed]);
+      const deviceResponseCbor = mdoc.encode();
+
+      // Decode and verify DeviceResponse structure
+      const decoded = cborDecode(deviceResponseCbor);
+
+      // DeviceResponse should have version, documents, status
+      expect(decoded.has('version')).toBe(true);
+      expect(decoded.has('documents')).toBe(true);
+      expect(decoded.has('status')).toBe(true);
+
+      // Verify documents structure
+      const documents = decoded.get('documents');
+      expect(Array.isArray(documents)).toBe(true);
+      expect(documents.length).toBe(1);
+
+      const doc = documents[0];
+      expect(doc.has('docType')).toBe(true);
+      expect(doc.get('docType')).toBe('org.iso.18013.5.1.mDL');
+      expect(doc.has('issuerSigned')).toBe(true);
+    });
+
+    it('should throw error for invalid IssuerSigned structure', () => {
+      const invalidCbor = Buffer.from('invalid');
+
+      expect(() => {
+        parseIssuerSigned(invalidCbor, 'org.iso.18013.5.1.mDL');
+      }).toThrow();
+    });
+
+    it('should throw error for missing nameSpaces', () => {
+      // Create CBOR with only issuerAuth
+      const { cborEncode } = require('../src/cbor');
+      const invalidStructure = new Map();
+      invalidStructure.set('issuerAuth', []);
+      const invalidCbor = cborEncode(invalidStructure);
+
+      expect(() => {
+        parseIssuerSigned(invalidCbor, 'org.iso.18013.5.1.mDL');
+      }).toThrow('missing nameSpaces or issuerAuth');
+    });
+
+    it('should support full OID4VCI to OID4VP workflow', () => {
+      // Step 1: OID4VCI - Encode IssuerSigned for credential response
+      const issuerSignedCbor = signedDocument.encodeIssuerSigned();
+      const issuerSignedBase64url = Buffer.from(issuerSignedCbor).toString('base64url');
+
+      // Verify OID4VCI credential response format
+      const credentialResponse = {
+        credentials: [{ credential: issuerSignedBase64url }],
+      };
+
+      expect(credentialResponse.credentials[0].credential).toBeTruthy();
+
+      // Step 2: Wallet receives and stores the credential
+      const receivedCbor = Buffer.from(issuerSignedBase64url, 'base64url');
+
+      // Step 3: OID4VP - Parse IssuerSigned and create DeviceResponse
+      const parsed = parseIssuerSigned(receivedCbor, 'org.iso.18013.5.1.mDL');
+      const mdoc = new MDoc([parsed]);
+      const deviceResponseCbor = mdoc.encode();
+
+      // Verify DeviceResponse can be created
+      expect(deviceResponseCbor).toBeInstanceOf(Buffer);
+      expect(deviceResponseCbor.length).toBeGreaterThan(0);
+
+      // Verify DeviceResponse structure
+      const decoded = cborDecode(deviceResponseCbor);
+      expect(decoded.has('version')).toBe(true);
+      expect(decoded.has('documents')).toBe(true);
     });
   });
 });

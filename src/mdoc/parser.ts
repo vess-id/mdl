@@ -114,3 +114,63 @@ export const parse = (
 
   return new MDoc(parsedDocuments, version, status);
 };
+
+/**
+ * Parse IssuerSigned CBOR and create IssuerSignedDocument.
+ * Used for OID4VCI issued credentials that only contain IssuerSigned structure.
+ *
+ * OID4VCI 1.0 Section A.2.4:
+ * The credential claim contains a base64url-encoded CBOR-encoded IssuerSigned structure.
+ *
+ * @param issuerSignedCbor - CBOR-encoded IssuerSigned structure
+ * @param docType - Document type (e.g., 'org.iso.18013.5.1.mDL')
+ * @returns IssuerSignedDocument
+ *
+ * @example
+ * ```typescript
+ * // Parse OID4VCI issued credential
+ * const issuerSignedDoc = parseIssuerSigned(credentialBytes, 'org.iso.18013.5.1.mDL');
+ *
+ * // Create MDoc for OID4VP presentation
+ * const mdoc = new MDoc([issuerSignedDoc]);
+ * ```
+ */
+export const parseIssuerSigned = (
+  issuerSignedCbor: Uint8Array,
+  docType: string,
+): IssuerSignedDocument => {
+  // Decode CBOR
+  const decoded = cborDecode(issuerSignedCbor);
+
+  // Validate IssuerSigned structure
+  if (!decoded || typeof decoded !== 'object') {
+    throw new MDLParseError('Invalid IssuerSigned CBOR');
+  }
+
+  // Check for Map structure (CBOR decodes to Map)
+  if (!(decoded instanceof Map)) {
+    throw new MDLParseError('IssuerSigned must be a CBOR Map');
+  }
+
+  if (!decoded.has('nameSpaces') || !decoded.has('issuerAuth')) {
+    throw new MDLParseError(
+      'Invalid IssuerSigned structure: missing nameSpaces or issuerAuth',
+    );
+  }
+
+  // Parse issuerAuth
+  const rawIssuerAuth = decoded.get('issuerAuth');
+  const issuerAuth = parseIssuerAuthElement(rawIssuerAuth, docType);
+
+  // Parse nameSpaces
+  const rawNameSpaces = decoded.get('nameSpaces');
+  const nameSpaces = mapIssuerNameSpaces(rawNameSpaces);
+
+  // Create IssuerSigned object
+  const issuerSigned = {
+    nameSpaces,
+    issuerAuth,
+  };
+
+  return new IssuerSignedDocument(docType, issuerSigned);
+};
