@@ -48,4 +48,42 @@ export class IssuerSignedDocument {
   get issuerSignedNameSpaces(): string[] {
     return Object.keys(this.issuerSigned.nameSpaces);
   }
+
+  /**
+   * Prepare IssuerSigned structure only (for OID4VCI issuance).
+   * Returns only the IssuerSigned part without docType wrapper.
+   *
+   * OID4VCI 1.0 Section A.2.4:
+   * The credential claim MUST be a base64url-encoded CBOR-encoded IssuerSigned structure.
+   *
+   * @returns {Object} - The IssuerSigned structure ready for CBOR encoding
+   */
+  prepareIssuerSigned(): {
+    nameSpaces: Map<string, any>;
+    issuerAuth: any;
+  } {
+    return {
+      nameSpaces: new Map(
+        Object.entries(this.issuerSigned?.nameSpaces ?? {}).map(([nameSpace, items]) => {
+          return [nameSpace, items.map((item) => item.dataItem)];
+        })
+      ),
+      issuerAuth: this.issuerSigned?.issuerAuth.getContentForEncoding(),
+    };
+  }
+
+  /**
+   * Encode IssuerSigned structure for OID4VCI credential response.
+   * Returns CBOR-encoded IssuerSigned structure as Buffer.
+   *
+   * This method is specifically designed for OID4VCI 1.0 credential issuance,
+   * where only the IssuerSigned structure (not the full DeviceResponse/MDoc)
+   * should be returned in the Credential Response.
+   *
+   * @returns {Buffer} - CBOR-encoded IssuerSigned structure
+   */
+  encodeIssuerSigned(): Buffer {
+    const { cborEncode } = require('../../cbor');
+    return cborEncode(this.prepareIssuerSigned());
+  }
 }
