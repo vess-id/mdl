@@ -33,26 +33,42 @@ export default class IssuerAuth extends Sign1 {
     }
     let decoded = cborDecode(this.payload);
     decoded = decoded instanceof DataItem ? decoded.data : decoded;
-    decoded = Object.fromEntries(decoded);
-    const mapValidityInfo = (validityInfo: Map<string, Uint8Array>) => {
+
+    // Convert to plain object if it's a Map, otherwise use as-is
+    if (decoded instanceof Map) {
+      decoded = Object.fromEntries(decoded);
+    }
+
+    const mapValidityInfo = (validityInfo: Map<string, Uint8Array> | any) => {
       if (!validityInfo) {
         return validityInfo;
       }
+      // Handle both Map and plain object
+      if (validityInfo instanceof Map) {
+        return Object.fromEntries(
+          [...validityInfo.entries()].map(([key, value]) => {
+            return [key, value instanceof Uint8Array ? cborDecode(value) : value];
+          }),
+        );
+      }
+      // Already a plain object - process values
       return Object.fromEntries(
-        [...validityInfo.entries()].map(([key, value]) => {
+        Object.entries(validityInfo).map(([key, value]) => {
           return [key, value instanceof Uint8Array ? cborDecode(value) : value];
         }),
       );
     };
+
+    const convertMapToObject = (input: Map<any, any> | any) => {
+      if (!input) return input;
+      return input instanceof Map ? Object.fromEntries(input) : input;
+    };
+
     const result: MSO = {
       ...decoded,
       validityInfo: mapValidityInfo(decoded.validityInfo),
-      validityDigests: decoded.validityDigests
-        ? Object.fromEntries(decoded.validityDigests)
-        : decoded.validityDigests,
-      deviceKeyInfo: decoded.deviceKeyInfo
-        ? Object.fromEntries(decoded.deviceKeyInfo)
-        : decoded.deviceKeyInfo,
+      validityDigests: convertMapToObject(decoded.validityDigests),
+      deviceKeyInfo: convertMapToObject(decoded.deviceKeyInfo),
     };
     this.#decodedPayload = result;
     return result;

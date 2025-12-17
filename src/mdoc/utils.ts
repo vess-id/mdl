@@ -97,8 +97,14 @@ export const calculateDeviceAutenticationBytes = (
 ): Uint8Array => {
   let decodedSessionTranscript: any;
   if (sessionTranscript instanceof Uint8Array) {
-    // assume is encoded in a DataItem
-    decodedSessionTranscript = (cborDecode(sessionTranscript) as DataItem).data;
+    // Decode CBOR to get the raw data
+    const decoded = cborDecode(sessionTranscript);
+    // Check if it's a DataItem and extract data, otherwise use decoded directly
+    if (decoded instanceof DataItem) {
+      decodedSessionTranscript = decoded.data;
+    } else {
+      decodedSessionTranscript = decoded;
+    }
   } else {
     decodedSessionTranscript = sessionTranscript;
   }
