@@ -32,8 +32,10 @@ const parseIssuerAuthElement = (
 
 const parseDeviceAuthElement = (rawDeviceAuth: RawDeviceAuth): DeviceAuth => {
   const { deviceSignature, deviceMac } = Object.fromEntries(rawDeviceAuth);
+
   if (deviceSignature) {
-    return { deviceSignature: new Sign1(...deviceSignature) };
+    const sign1 = new Sign1(...deviceSignature);
+    return { deviceSignature: sign1 };
   }
   return { deviceMac: new Mac0(...deviceMac) };
 };
@@ -79,6 +81,7 @@ export const parse = (
 
   // Handle both Map and Object responses from cbor-x
   const isResponseMap = deviceResponse instanceof Map;
+
   const responseData = isResponseMap
     ? Object.fromEntries(deviceResponse)
     : deviceResponse;

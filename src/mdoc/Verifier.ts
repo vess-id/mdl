@@ -116,6 +116,7 @@ export class Verifier {
       });
       return;
     }
+
     const { deviceAuth, nameSpaces } = document.deviceSigned;
     const { docType } = document;
     const { deviceKeyInfo } = document.issuerSigned.issuerAuth.decodedPayload;
@@ -158,19 +159,24 @@ export class Verifier {
 
     if (deviceAuth.deviceSignature) {
       const deviceKeyJwk = COSEKeyToJWK(deviceKeyCoseKey);
+
       // When deviceKey (COSE Key) does not contain the `alg` parameter, use the one specified by the COSE_Sign1
-      const deviceKey = await importJWK(deviceKeyJwk, deviceKeyJwk.alg ?? deviceAuth.deviceSignature.algName);
+      const algToUse = deviceKeyJwk.alg ?? deviceAuth.deviceSignature.algName;
+
+      const deviceKey = await importJWK(deviceKeyJwk, algToUse);
 
       // ECDSA/EdDSA authentication
       try {
         const ds = deviceAuth.deviceSignature;
 
-        const verificationResult = await new Sign1(
+        const sign1 = new Sign1(
           ds.protectedHeaders,
           ds.unprotectedHeaders,
           deviceAuthenticationBytes,
           ds.signature,
-        ).verify(deviceKey);
+        );
+
+        const verificationResult = await sign1.verify(deviceKey);
 
         onCheck({
           status: verificationResult ? 'PASSED' : 'FAILED',

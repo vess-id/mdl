@@ -99,6 +99,7 @@ export const calculateDeviceAutenticationBytes = (
   if (sessionTranscript instanceof Uint8Array) {
     // Decode CBOR to get the raw data
     const decoded = cborDecode(sessionTranscript);
+
     // Check if it's a DataItem and extract data, otherwise use decoded directly
     if (decoded instanceof DataItem) {
       decodedSessionTranscript = decoded.data;
@@ -110,6 +111,7 @@ export const calculateDeviceAutenticationBytes = (
   }
 
   const nameSpacesAsMap = new Map(Object.entries(nameSpaces).map(([ns, items]) => [ns, new Map(Object.entries(items))]));
+
   const encode = DataItem.fromData([
     'DeviceAuthentication',
     decodedSessionTranscript,
